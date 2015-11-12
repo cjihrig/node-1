@@ -415,6 +415,8 @@ Returns `true` if the given "object" is a `Buffer`. `false` otherwise.
     util.isBuffer(new Buffer('hello world'))
       // true
 
+Use `Buffer.isBuffer()` instead.
+
 ## util.inherits(constructor, superConstructor)
 
 Inherit the prototype methods from one
