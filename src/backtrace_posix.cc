@@ -14,7 +14,7 @@ void DumpBacktrace(FILE* fp) {
     return;
   }
   for (int i = 1; i < size; i += 1) {
-    const void* frame = frames[i];
+    void* frame = frames[i];
     fprintf(fp, "%2d: ", i);
     Dl_info info;
     const bool have_info = dladdr(frame, &info);
