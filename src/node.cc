@@ -2383,6 +2383,7 @@ static void OnFatalError(const char* location, const char* message) {
   } else {
     PrintErrorString("FATAL ERROR: %s\n", message);
   }
+  DumpBacktrace(stderr);
   fflush(stderr);
   ABORT();
 }
