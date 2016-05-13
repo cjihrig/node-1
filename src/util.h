@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <signal.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 namespace node {
@@ -21,9 +22,21 @@ namespace node {
 
 // Windows 8+ does not like abort() in Release mode
 #ifdef _WIN32
-#define ABORT() raise(SIGABRT)
+#define ABORT_NO_BACKTRACE() raise(SIGABRT)
 #else
-#define ABORT() abort()
+#define ABORT_NO_BACKTRACE() abort()
+#endif
+
+// This macro is also used indirectly by some of the addons in test/addons.
+#ifdef NODE_WANT_INTERNALS
+# define ABORT()                                                              \
+  do {                                                                        \
+    node::DumpBacktrace(stderr);                                              \
+    fflush(stderr);                                                           \
+    ABORT_NO_BACKTRACE();                                                     \
+  } while (0)
+#else
+# define ABORT() ABORT_NO_BACKTRACE()
 #endif
 
 #if defined(NDEBUG)
