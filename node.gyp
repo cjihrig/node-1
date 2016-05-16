@@ -402,6 +402,7 @@
 
         [ 'OS=="win"', {
           'sources': [
+            'src/backtrace_win32.cc',
             'src/res/node.rc',
           ],
           'defines!': [
@@ -416,6 +417,7 @@
           'libraries': [ '-lpsapi.lib' ]
         }, { # POSIX
           'defines': [ '__POSIX__' ],
+          'sources': [ 'src/backtrace_posix.cc' ],
         }],
         [ 'OS=="mac"', {
           # linking Corefoundation is needed since certain OSX debugging tools

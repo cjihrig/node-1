@@ -7,6 +7,7 @@
 #include "uv.h"
 #include "v8.h"
 
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -136,6 +137,8 @@ bool IsExceptionDecorated(Environment* env, v8::Local<v8::Value> er);
 void AppendExceptionLine(Environment* env,
                          v8::Local<v8::Value> er,
                          v8::Local<v8::Message> message);
+
+void DumpBacktrace(FILE* fp);
 
 NO_RETURN void FatalError(const char* location, const char* message);
 
