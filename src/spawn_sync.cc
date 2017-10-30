@@ -1004,6 +1004,7 @@ int SyncProcessRunner::CopyJsString(Local<Value> js_value,
 int SyncProcessRunner::CopyJsStringArray(Local<Value> js_value,
                                          char** target) {
   Isolate* isolate = env()->isolate();
+  Local<Array> input_array;
   Local<Array> js_array;
   uint32_t length;
   size_t list_size, data_size, data_offset;
@@ -1014,24 +1015,22 @@ int SyncProcessRunner::CopyJsStringArray(Local<Value> js_value,
     return UV_EINVAL;
 
   Local<Context> context = env()->context();
-  js_array = js_value.As<Array>()->Clone().As<Array>();
-  length = js_array->Length();
+  input_array = js_value.As<Array>();
+  length = input_array->Length();
+  js_array = Array::New(isolate, length);
   data_size = 0;
 
   // Index has a pointer to every string element, plus one more for a final
   // null pointer.
   list_size = (length + 1) * sizeof *list;
 
-  // Convert all array elements to string. Modify the js object itself if
-  // needed - it's okay since we cloned the original object. Also compute the
-  // length of all strings, including room for a null terminator after every
-  // string. Align strings to cache lines.
+  // Convert all array elements to string. Also compute the length of all
+  // strings, including room for a null terminator after every string. Align
+  // strings to cache lines.
   for (uint32_t i = 0; i < length; i++) {
-    auto value = js_array->Get(context, i).ToLocalChecked();
+    auto value = input_array->Get(context, i).ToLocalChecked();
 
-    if (!value->IsString())
-      js_array->Set(context, i, value->ToString(env()->isolate())).FromJust();
-
+    js_array->Set(context, i, value->ToString(env()->isolate())).FromJust();
     data_size += StringBytes::StorageSize(isolate, value, UTF8) + 1;
     data_size = ROUND_UP(data_size, sizeof(void*));
   }
