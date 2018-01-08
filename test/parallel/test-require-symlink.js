@@ -59,6 +59,23 @@ function test() {
   fs.symlinkSync(linkTarget, linkDir);
   fs.symlinkSync(linkScriptTarget, linkScript);
 
+  // Verify the effects of symlinks on require.resolve().
+  {
+    const linkScriptPath = path.resolve(linkScript);
+
+    assert.strictEqual(require.resolve(linkScriptPath), linkScriptPath);
+    assert.strictEqual(
+      require.resolve(linkScriptPath,
+                      { preserveSymlinks: true, useCache: false }),
+      linkScriptPath
+    );
+    assert.strictEqual(
+      require.resolve(linkScriptPath,
+                      { preserveSymlinks: false, useCache: false }),
+      path.resolve(linkScriptTarget)
+    );
+  }
+
   // load symlinked-module
   const fooModule = require(path.join(tmpDirTarget, 'foo.js'));
   assert.strictEqual(fooModule.dep1.bar.version, 'CORRECT_VERSION');
