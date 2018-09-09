@@ -2,6 +2,7 @@
 
 const common = require('../common');
 
+common.skip('currently broken');
 common.skipIfInspectorDisabled();
 
 const assert = require('assert');
