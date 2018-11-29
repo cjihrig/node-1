@@ -150,7 +150,7 @@ do {                                                                 \
 #define COUNT_HEADER_SIZE(V)                                         \
 do {                                                                 \
   parser->nread += (V);                                              \
-  if (UNLIKELY(parser->nread > (HTTP_MAX_HEADER_SIZE))) {            \
+  if (UNLIKELY(parser->nread > parser->max_header_size)) {           \
     SET_ERRNO(HPE_HEADER_OVERFLOW);                                  \
     goto error;                                                      \
   }                                                                  \
@@ -2105,6 +2105,7 @@ http_parser_init (http_parser *parser, enum http_parser_type t)
   parser->type = t;
   parser->state = (t == HTTP_REQUEST ? s_start_req : (t == HTTP_RESPONSE ? s_start_res : s_start_req_or_res));
   parser->http_errno = HPE_OK;
+  parser->max_header_size = HTTP_MAX_HEADER_SIZE;
 }
 
 void

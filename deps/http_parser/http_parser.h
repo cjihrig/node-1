@@ -318,6 +318,8 @@ struct http_parser {
 
   /** PUBLIC **/
   void *data; /* A pointer to get hook to the "connection" or "socket" object */
+
+  uint32_t max_header_size;
 };
 
 

@@ -150,11 +150,12 @@ struct StringPtr {
 
 class Parser : public AsyncWrap, public StreamListener {
  public:
-  Parser(Environment* env, Local<Object> wrap, parser_type_t type)
+  Parser(Environment* env, Local<Object> wrap, parser_type_t type,
+         uint32_t max_header_size)
       : AsyncWrap(env, wrap, AsyncWrap::PROVIDER_HTTPPARSER),
         current_buffer_len_(0),
         current_buffer_data_(nullptr) {
-    Init(type);
+    Init(type, max_header_size);
   }
 
 
@@ -423,7 +424,9 @@ class Parser : public AsyncWrap, public StreamListener {
     parser_type_t type =
         static_cast<parser_type_t>(args[0].As<Int32>()->Value());
     CHECK(type == HTTP_REQUEST || type == HTTP_RESPONSE);
-    new Parser(env, args.This(), type);
+    uint32_t max_header_size = args[1]->IsUint32() ?
+      args[1].As<Uint32>()->Value(): 0;
+    new Parser(env, args.This(), type, max_header_size);
   }
 
 
@@ -515,7 +518,7 @@ class Parser : public AsyncWrap, public StreamListener {
     if (isReused) {
       parser->AsyncReset();
     }
-    parser->Init(type);
+    parser->Init(type, 1024);
   }
 
 
@@ -781,12 +784,14 @@ class Parser : public AsyncWrap, public StreamListener {
   }
 
 
-  void Init(parser_type_t type) {
+  void Init(parser_type_t type, uint32_t max_header_size) {
 #ifdef NODE_EXPERIMENTAL_HTTP
     llhttp_init(&parser_, type, &settings);
     header_nread_ = 0;
 #else  /* !NODE_EXPERIMENTAL_HTTP */
     http_parser_init(&parser_, type);
+    parser_.max_header_size = max_header_size;
+    printf("max_header_size is %d %d\n", max_header_size, parser_.max_header_size);
 #endif  /* NODE_EXPERIMENTAL_HTTP */
     url_.Reset();
     status_message_.Reset();
