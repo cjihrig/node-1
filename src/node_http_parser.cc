@@ -787,6 +787,7 @@ class Parser : public AsyncWrap, public StreamListener {
     header_nread_ = 0;
 #else  /* !NODE_EXPERIMENTAL_HTTP */
     http_parser_init(&parser_, type);
+    http_parser_set_max_header_size(1024);
 #endif  /* NODE_EXPERIMENTAL_HTTP */
     url_.Reset();
     status_message_.Reset();
