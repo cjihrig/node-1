@@ -1,6 +1,7 @@
 #include "inspector_agent.h"
 
 #include "inspector/main_thread_interface.h"
+#include "inspector/network_agent.h"
 #include "inspector/node_string.h"
 #include "inspector/tracing_agent.h"
 #include "inspector/worker_agent.h"
