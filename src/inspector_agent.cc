@@ -222,6 +222,8 @@ class ChannelImpl final : public v8_inspector::V8Inspector::Channel,
       : delegate_(std::move(delegate)), prevent_shutdown_(prevent_shutdown) {
     session_ = inspector->connect(1, this, StringView());
     node_dispatcher_ = std::make_unique<protocol::UberDispatcher>(this);
+    network_agent_ = std::make_unique<protocol::NetworkAgent>();
+    network_agent_->Wire(node_dispatcher_.get());
     tracing_agent_ =
         std::make_unique<protocol::TracingAgent>(env, main_thread_);
     tracing_agent_->Wire(node_dispatcher_.get());
@@ -230,6 +232,8 @@ class ChannelImpl final : public v8_inspector::V8Inspector::Channel,
   }
 
   ~ChannelImpl() override {
+    network_agent_->disable();
+    network_agent_.reset();  // Dispose before the dispatchers
     tracing_agent_->disable();
     tracing_agent_.reset();  // Dispose before the dispatchers
     worker_agent_->disable();
@@ -292,6 +296,7 @@ class ChannelImpl final : public v8_inspector::V8Inspector::Channel,
     sendMessageToFrontend(message->serialize());
   }
 
+  std::unique_ptr<protocol::NetworkAgent> network_agent_;
   std::unique_ptr<protocol::TracingAgent> tracing_agent_;
   std::unique_ptr<protocol::WorkerAgent> worker_agent_;
   std::unique_ptr<InspectorSessionDelegate> delegate_;
