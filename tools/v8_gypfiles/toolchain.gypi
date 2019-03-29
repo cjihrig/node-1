@@ -166,6 +166,11 @@
       '<(V8_ROOT)/include',
     ],
     'conditions': [
+      ['want_separate_host_toolset', {
+        'toolsets': ['host', 'target'],
+      }, {
+        'toolsets': ['target'],
+      }],
       ['v8_target_arch=="arm"', {
         'defines': [
           'V8_TARGET_ARCH_ARM',
@@ -1406,6 +1411,7 @@
       4324,  # Padding structure due to alignment.
       4351,
       4355,
+      4661,  # no suitable definition provided for explicit template instantiation request
       4701,  # Potentially uninitialized local variable.
       4702,  # Unreachable code.
       4703,  # Potentially uninitialized local pointer variable.
