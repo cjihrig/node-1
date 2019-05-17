@@ -297,6 +297,8 @@ Code GenerateBytecodeHandler(Isolate* isolate, int builtin_index,
 
 }  // namespace
 
+#pragma optimize( "", off )
+
 // static
 void SetupIsolateDelegate::SetupBuiltinsInternal(Isolate* isolate) {
   Builtins* builtins = isolate->builtins();
@@ -379,6 +381,8 @@ void SetupIsolateDelegate::SetupBuiltinsInternal(Isolate* isolate) {
 
   builtins->MarkInitialized();
 }
+
+#pragma optimize( "", on )
 
 }  // namespace internal
 }  // namespace v8
