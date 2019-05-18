@@ -165,8 +165,8 @@ consts_misc = [
         'value': 'Map::NumberOfOwnDescriptorsBits::kMask' },
     { 'name': 'bit_field3_number_of_own_descriptors_shift',
         'value': 'Map::NumberOfOwnDescriptorsBits::kShift' },
-    { 'name': 'class_Map__instance_descriptors_offset',
-        'value': 'Map::kDescriptorsOffset' },
+    #{ 'name': 'class_Map__instance_descriptors_offset',
+    #    'value': 'Map::kDescriptorsOffset' },
 
     { 'name': 'off_fp_context_or_frame_type',
         'value': 'CommonFrameConstants::kContextOrFrameTypeOffset'},
