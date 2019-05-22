@@ -459,7 +459,8 @@
       # v8_external_snapshot, depending on the current variables.
       # The intention is to make the 'calling' rules a bit simpler.
       'target_name': 'v8_maybe_snapshot',
-      'type': 'static_library',
+      'type': 'none',
+      'hard_dependency': 1,
       'conditions': [
         ['v8_use_snapshot!=1', {
           # The dependency on v8_base should come from a transitive
@@ -2220,8 +2221,7 @@
             '<(V8_ROOT)/src/runtime/runtime-intl.cc',
           ],
         }],
-        ['v8_postmortem_support==1', {
-          'sources': [ '<(SHARED_INTERMEDIATE_DIR)/debug-support.cc', ],
+        ['v8_postmortem_support', {
           'dependencies': [ 'postmortem-metadata#target' ],
         }],
         # Platforms that don't have Compare-And-Swap (CAS) support need to link atomic library
@@ -2848,6 +2848,7 @@
 
     {
       'target_name': 'v8',
+      'hard_dependency': 1,
       'dependencies': [ 'v8_maybe_snapshot' ],
       'conditions': [
         ['component=="shared_library"', {
@@ -3020,6 +3021,9 @@
           ],
         },
       ],
+      'direct_dependent_settings': {
+        'sources': [ '<(SHARED_INTERMEDIATE_DIR)/debug-support.cc', ],
+      },
     }, # postmortem-metadata
   ],
 }

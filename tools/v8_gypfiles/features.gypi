@@ -35,7 +35,7 @@
 
     # Emulate GN variables
     'conditions': [
-      ['OS != "win"', {
+      ['OS != "win" and OS != "solaris" and OS != "fuchsia"', {
         'is_posix': 1,
       }, {
         'is_posix': 0,
