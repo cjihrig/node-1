@@ -655,7 +655,7 @@
 
         'v8_base_without_compiler',
         'v8_compiler_for_mksnapshot',
-        'v8_init',
+        'v8_initializers',
         'v8_libbase',
         'v8_libplatform',
       ],
@@ -2426,7 +2426,7 @@
             '<(V8_ROOT)/src/base/platform/platform-posix.h',
           ],
           'conditions': [
-            ['OS != "aix"', {
+            ['OS != "aix" and OS != "solaris"', {
               'sources': [
                 '<(V8_ROOT)/src/base/platform/platform-posix-time.cc',
                 '<(V8_ROOT)/src/base/platform/platform-posix-time.h',

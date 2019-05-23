@@ -131,7 +131,11 @@ class CompilationUnitQueues {
       queues_[task_id].next_steal_task_id_ = next_task_id(task_id);
     }
     for (auto& atomic_counter : num_units_) {
+#if defined(V8_OS_SOLARIS)
+      atomic_counter.store(size_t{0});
+#else
       std::atomic_init(&atomic_counter, size_t{0});
+#endif
     }
   }
 
