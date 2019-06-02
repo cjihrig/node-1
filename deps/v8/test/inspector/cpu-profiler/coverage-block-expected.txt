@@ -221,7 +221,7 @@ Running test: testPreciseCountCoverageIncremental
     result : {
         result : {
             type : string
-            value : unoptimized
+            value : optimized
         }
     }
 }
@@ -262,9 +262,14 @@ Running test: testPreciseCountCoverageIncremental
                                 startOffset : 74
                             }
                             [1] : {
-                                count : 0
+                                count : 1
                                 endOffset : 156
                                 startOffset : 143
+                            }
+                            [2] : {
+                                count : 1
+                                endOffset : 172
+                                startOffset : 157
                             }
                         ]
                     }
@@ -812,22 +817,6 @@ Running test: testPreciseBinaryCoverage
             [0] : {
                 functions : [
                     [0] : {
-                        functionName : fib
-                        isBlockCoverage : true
-                        ranges : [
-                            [0] : {
-                                count : 0
-                                endOffset : 73
-                                startOffset : 1
-                            }
-                            [1] : {
-                                count : 1
-                                endOffset : 72
-                                startOffset : 32
-                            }
-                        ]
-                    }
-                    [1] : {
                         functionName : is_optimized
                         isBlockCoverage : true
                         ranges : [
