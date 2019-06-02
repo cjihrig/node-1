@@ -151,16 +151,6 @@ class CompilationUnitQueues {
     for (int task_id = 0; task_id < max_tasks; ++task_id) {
       queues_[task_id].next_steal_task_id = next_task_id(task_id);
     }
-    for (auto& atomic_counter : num_units_) {
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wbraced-scalar-init"
-#endif
-      atomic_counter = ATOMIC_VAR_INIT(0);
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-    }
   }
 
   base::Optional<WasmCompilationUnit> GetNextUnit(
@@ -263,14 +253,15 @@ class CompilationUnitQueues {
   };
 
   struct BigUnitsQueue {
-    BigUnitsQueue() {
-      for (auto& atomic : has_units) std::atomic_init(&atomic, false);
-    }
+    BigUnitsQueue() = default;
 
     base::Mutex mutex;
 
     // Can be read concurrently to check whether any elements are in the queue.
-    std::atomic<bool> has_units[kNumTiers];
+    std::atomic_bool has_units[kNumTiers] = {
+      ATOMIC_VAR_INIT(false),
+      ATOMIC_VAR_INIT(false)
+    };
 
     // Protected by {mutex}:
     std::priority_queue<BigUnit> units[kNumTiers];
@@ -279,8 +270,11 @@ class CompilationUnitQueues {
   std::vector<Queue> queues_;
   BigUnitsQueue big_units_queue_;
 
-  std::atomic<size_t> num_units_[kNumTiers];
-  std::atomic<int> next_queue_to_add{0};
+  std::atomic_size_t num_units_[kNumTiers] = {
+    ATOMIC_VAR_INIT(0),
+    ATOMIC_VAR_INIT(0)
+  };
+  std::atomic_int next_queue_to_add{0};
 
   int next_task_id(int task_id) const {
     int next = task_id + 1;
@@ -478,7 +472,7 @@ class CompilationStateImpl {
 
   // Compilation error, atomically updated. This flag can be updated and read
   // using relaxed semantics.
-  std::atomic<bool> compile_failed_{false};
+  std::atomic_bool compile_failed_{false};
 
   const int max_background_tasks_ = 0;
 
