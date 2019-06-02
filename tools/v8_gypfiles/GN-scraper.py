@@ -5,10 +5,10 @@ import os
 
 PLAIN_SOURCE_RE = re.compile('\s*"([^/$].+)"\s*')
 def DoMain(args):
-  gn_file, pattern = args
-  src_root = os.path.dirname(gn_file)
-  with open(gn_file, 'r') as f:
-    gn_content = f.read().encode('utf-8')
+  gn_filename, pattern = args
+  src_root = os.path.dirname(gn_filename)
+  with open(gn_filename, 'r') as gn_file:
+    gn_content = gn_file.read().encode('utf-8')
 
   scraper_re = re.compile(pattern + r'\[([^\]]+)', re.DOTALL)
   matches = scraper_re.search(gn_content)
