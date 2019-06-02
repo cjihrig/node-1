@@ -73,7 +73,6 @@
       "<(V8_ROOT)/src/builtins/typed-array-some.tq",
       "<(V8_ROOT)/src/builtins/typed-array-subarray.tq",
       "<(V8_ROOT)/src/builtins/typed-array.tq",
-      "<(V8_ROOT)/src/objects/intl-objects.tq", # todo: only set this if v8_enable_i18n_support
       "<(V8_ROOT)/third_party/v8/builtins/array-sort.tq",
     ],
     'torque_namespaces': [
@@ -136,6 +135,14 @@
     'torque_outputs': ['<!@pymod_do_main(ForEachFormat "<(torque_output_root)/torque-generated/builtins-%s-gen-tq.cc" <@(torque_namespaces))'],
     'torque_outputs+': ['<!@pymod_do_main(ForEachFormat "<(torque_output_root)/torque-generated/builtins-%s-gen-tq.h" <@(torque_namespaces))'],
     'v8_compiler_sources': ['<!@pymod_do_main(GN-scraper "<(V8_ROOT)/BUILD.gn"  "v8_compiler_sources = ")'],
+
+    'conditions': [
+      ['v8_enable_i18n_support', {
+        'torque_files': [
+          "<(V8_ROOT)/src/objects/intl-objects.tq",
+        ]
+      }]
+    ],
   },
   'includes': ['toolchain.gypi', 'features.gypi', 'v8_external_snapshot.gypi'],
   'targets': [
