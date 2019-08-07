@@ -229,6 +229,15 @@ consts_misc = [
 
     { 'name': 'class_SharedFunctionInfo__function_data__Object',
         'value': 'SharedFunctionInfo::kFunctionDataOffset' },
+
+    { 'name': 'class_ConsString__first_offset__int',
+        'value': 'ConsString::kFirstOffset' },
+    { 'name': 'class_ConsString__second_offset__int',
+        'value': 'ConsString::kSecondOffset' },
+    { 'name': 'class_SlicedString__offset_offset__int',
+        'value': 'SlicedString::kOffsetOffset' },
+    { 'name': 'class_ThinString__actual_offset__int',
+        'value': 'ThinString::kActualOffset' },
 ];
 
 #
