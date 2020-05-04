@@ -185,7 +185,8 @@ void WASI::New(const FunctionCallbackInfo<Value>& args) {
   options.err = 2;
   options.fd_table_size = 3;
   options.argc = argc;
-  options.argv = argc == 0 ? nullptr : new char*[argc];
+  options.argv =
+    const_cast<const char**>(argc == 0 ? nullptr : new char*[argc]);
 
   for (uint32_t i = 0; i < argc; i++) {
     auto arg = argv->Get(context, i).ToLocalChecked();
@@ -197,7 +198,7 @@ void WASI::New(const FunctionCallbackInfo<Value>& args) {
 
   Local<Array> env_pairs = args[1].As<Array>();
   const uint32_t envc = env_pairs->Length();
-  options.envp = new char*[envc + 1];
+  options.envp = const_cast<const char**>(new char*[envc + 1]);
   for (uint32_t i = 0; i < envc; i++) {
     auto pair = env_pairs->Get(context, i).ToLocalChecked();
     CHECK(pair->IsString());
@@ -230,13 +231,13 @@ void WASI::New(const FunctionCallbackInfo<Value>& args) {
 
   if (options.argv != nullptr) {
     for (uint32_t i = 0; i < argc; i++)
-      free(options.argv[i]);
+      free(const_cast<char*>(options.argv[i]));
     delete[] options.argv;
   }
 
   if (options.envp != nullptr) {
     for (uint32_t i = 0; options.envp[i]; i++)
-      free(options.envp[i]);
+      free(const_cast<char*>(options.envp[i]));
     delete[] options.envp;
   }
 
@@ -267,7 +268,10 @@ void WASI::ArgsGet(const FunctionCallbackInfo<Value>& args) {
                          mem_size,
                          argv_buf_offset,
                          wasi->uvw_.argv_buf_size);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, argv_offset, wasi->uvw_.argc * 4);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         argv_offset,
+                         wasi->uvw_.argc * UVWASI_SERDES_SIZE_uint32_t);
   std::vector<char*> argv(wasi->uvw_.argc);
   char* argv_buf = &memory[argv_buf_offset];
   uvwasi_errno_t err = uvwasi_args_get(&wasi->uvw_, argv.data(), argv_buf);
@@ -275,7 +279,10 @@ void WASI::ArgsGet(const FunctionCallbackInfo<Value>& args) {
   if (err == UVWASI_ESUCCESS) {
     for (size_t i = 0; i < wasi->uvw_.argc; i++) {
       uint32_t offset = argv_buf_offset + (argv[i] - argv[0]);
-      wasi->writeUInt32(memory, offset, argv_offset + (i * 4));
+      uvwasi_serdes_write_uint32_t(memory,
+                                   argv_offset +
+                                   (i * UVWASI_SERDES_SIZE_uint32_t),
+                                   offset);
     }
   }
 
@@ -295,16 +302,22 @@ void WASI::ArgsSizesGet(const FunctionCallbackInfo<Value>& args) {
   ASSIGN_INITIALIZED_OR_RETURN_UNWRAP(&wasi, args.This());
   Debug(wasi, "args_sizes_get(%d, %d)\n", argc_offset, argv_buf_offset);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, argc_offset, 4);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, argv_buf_offset, 4);
-  size_t argc;
-  size_t argv_buf_size;
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         argc_offset,
+                         UVWASI_SERDES_SIZE_size_t);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         argv_buf_offset,
+                         UVWASI_SERDES_SIZE_size_t);
+  uvwasi_size_t argc;
+  uvwasi_size_t argv_buf_size;
   uvwasi_errno_t err = uvwasi_args_sizes_get(&wasi->uvw_,
                                              &argc,
                                              &argv_buf_size);
   if (err == UVWASI_ESUCCESS) {
-    wasi->writeUInt32(memory, argc, argc_offset);
-    wasi->writeUInt32(memory, argv_buf_size, argv_buf_offset);
+    uvwasi_serdes_write_size_t(memory, argc_offset, argc);
+    uvwasi_serdes_write_size_t(memory, argv_buf_offset, argv_buf_size);
   }
 
   args.GetReturnValue().Set(err);
@@ -323,13 +336,16 @@ void WASI::ClockResGet(const FunctionCallbackInfo<Value>& args) {
   ASSIGN_INITIALIZED_OR_RETURN_UNWRAP(&wasi, args.This());
   Debug(wasi, "clock_res_get(%d, %d)\n", clock_id, resolution_ptr);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, resolution_ptr, 8);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         resolution_ptr,
+                         UVWASI_SERDES_SIZE_timestamp_t);
   uvwasi_timestamp_t resolution;
   uvwasi_errno_t err = uvwasi_clock_res_get(&wasi->uvw_,
                                             clock_id,
                                             &resolution);
   if (err == UVWASI_ESUCCESS)
-    wasi->writeUInt64(memory, resolution, resolution_ptr);
+    uvwasi_serdes_write_timestamp_t(memory, resolution_ptr, resolution);
 
   args.GetReturnValue().Set(err);
 }
@@ -349,14 +365,17 @@ void WASI::ClockTimeGet(const FunctionCallbackInfo<Value>& args) {
   ASSIGN_INITIALIZED_OR_RETURN_UNWRAP(&wasi, args.This());
   Debug(wasi, "clock_time_get(%d, %d, %d)\n", clock_id, precision, time_ptr);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, time_ptr, 8);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         time_ptr,
+                         UVWASI_SERDES_SIZE_timestamp_t);
   uvwasi_timestamp_t time;
   uvwasi_errno_t err = uvwasi_clock_time_get(&wasi->uvw_,
                                              clock_id,
                                              precision,
                                              &time);
   if (err == UVWASI_ESUCCESS)
-    wasi->writeUInt64(memory, time, time_ptr);
+    uvwasi_serdes_write_timestamp_t(memory, time_ptr, time);
 
   args.GetReturnValue().Set(err);
 }
@@ -378,7 +397,10 @@ void WASI::EnvironGet(const FunctionCallbackInfo<Value>& args) {
                          mem_size,
                          environ_buf_offset,
                          wasi->uvw_.env_buf_size);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, environ_offset, wasi->uvw_.envc * 4);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         environ_offset,
+                         wasi->uvw_.envc * UVWASI_SERDES_SIZE_uint32_t);
   std::vector<char*> environment(wasi->uvw_.envc);
   char* environ_buf = &memory[environ_buf_offset];
   uvwasi_errno_t err = uvwasi_environ_get(&wasi->uvw_,
@@ -388,7 +410,11 @@ void WASI::EnvironGet(const FunctionCallbackInfo<Value>& args) {
   if (err == UVWASI_ESUCCESS) {
     for (size_t i = 0; i < wasi->uvw_.envc; i++) {
       uint32_t offset = environ_buf_offset + (environment[i] - environment[0]);
-      wasi->writeUInt32(memory, offset, environ_offset + (i * 4));
+
+      uvwasi_serdes_write_uint32_t(memory,
+                                   environ_offset +
+                                   (i * UVWASI_SERDES_SIZE_uint32_t),
+                                   offset);
     }
   }
 
@@ -408,16 +434,22 @@ void WASI::EnvironSizesGet(const FunctionCallbackInfo<Value>& args) {
   ASSIGN_INITIALIZED_OR_RETURN_UNWRAP(&wasi, args.This());
   Debug(wasi, "environ_sizes_get(%d, %d)\n", envc_offset, env_buf_offset);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, envc_offset, 4);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, env_buf_offset, 4);
-  size_t envc;
-  size_t env_buf_size;
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         envc_offset,
+                         UVWASI_SERDES_SIZE_size_t);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         env_buf_offset,
+                         UVWASI_SERDES_SIZE_size_t);
+  uvwasi_size_t envc;
+  uvwasi_size_t env_buf_size;
   uvwasi_errno_t err = uvwasi_environ_sizes_get(&wasi->uvw_,
                                                 &envc,
                                                 &env_buf_size);
   if (err == UVWASI_ESUCCESS) {
-    wasi->writeUInt32(memory, envc, envc_offset);
-    wasi->writeUInt32(memory, env_buf_size, env_buf_offset);
+    uvwasi_serdes_write_size_t(memory, envc_offset, envc);
+    uvwasi_serdes_write_size_t(memory, env_buf_offset, env_buf_size);
   }
 
   args.GetReturnValue().Set(err);
@@ -494,16 +526,12 @@ void WASI::FdFdstatGet(const FunctionCallbackInfo<Value>& args) {
   ASSIGN_INITIALIZED_OR_RETURN_UNWRAP(&wasi, args.This());
   Debug(wasi, "fd_fdstat_get(%d, %d)\n", fd, buf);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, buf, 24);
+  CHECK_BOUNDS_OR_RETURN(args, mem_size, buf, UVWASI_SERDES_SIZE_fdstat_t);
   uvwasi_fdstat_t stats;
   uvwasi_errno_t err = uvwasi_fd_fdstat_get(&wasi->uvw_, fd, &stats);
 
-  if (err == UVWASI_ESUCCESS) {
-    wasi->writeUInt8(memory, stats.fs_filetype, buf);
-    wasi->writeUInt16(memory, stats.fs_flags, buf + 2);
-    wasi->writeUInt64(memory, stats.fs_rights_base, buf + 8);
-    wasi->writeUInt64(memory, stats.fs_rights_inheriting, buf + 16);
-  }
+  if (err == UVWASI_ESUCCESS)
+    uvwasi_serdes_write_fdstat_t(memory, buf, &stats);
 
   args.GetReturnValue().Set(err);
 }
@@ -558,20 +586,12 @@ void WASI::FdFilestatGet(const FunctionCallbackInfo<Value>& args) {
   ASSIGN_INITIALIZED_OR_RETURN_UNWRAP(&wasi, args.This());
   Debug(wasi, "fd_filestat_get(%d, %d)\n", fd, buf);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, buf, 64);
+  CHECK_BOUNDS_OR_RETURN(args, mem_size, buf, UVWASI_SERDES_SIZE_filestat_t);
   uvwasi_filestat_t stats;
   uvwasi_errno_t err = uvwasi_fd_filestat_get(&wasi->uvw_, fd, &stats);
 
-  if (err == UVWASI_ESUCCESS) {
-    wasi->writeUInt64(memory, stats.st_dev, buf);
-    wasi->writeUInt64(memory, stats.st_ino, buf + 8);
-    wasi->writeUInt8(memory, stats.st_filetype, buf + 16);
-    wasi->writeUInt64(memory, stats.st_nlink, buf + 24);
-    wasi->writeUInt64(memory, stats.st_size, buf + 32);
-    wasi->writeUInt64(memory, stats.st_atim, buf + 40);
-    wasi->writeUInt64(memory, stats.st_mtim, buf + 48);
-    wasi->writeUInt64(memory, stats.st_ctim, buf + 56);
-  }
+  if (err == UVWASI_ESUCCESS)
+    uvwasi_serdes_write_filestat_t(memory, buf, &stats);
 
   args.GetReturnValue().Set(err);
 }
@@ -643,7 +663,7 @@ void WASI::FdPread(const FunctionCallbackInfo<Value>& args) {
         nread_ptr);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
   CHECK_BOUNDS_OR_RETURN(args, mem_size, iovs_ptr, iovs_len * 8);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, nread_ptr, 4);
+  CHECK_BOUNDS_OR_RETURN(args, mem_size, nread_ptr, UVWASI_SERDES_SIZE_size_t);
   uvwasi_iovec_t* iovs = UncheckedCalloc<uvwasi_iovec_t>(iovs_len);
 
   if (iovs == nullptr) {
@@ -669,7 +689,7 @@ void WASI::FdPread(const FunctionCallbackInfo<Value>& args) {
     iovs[i].buf_len = buf_len;
   }
 
-  size_t nread;
+  uvwasi_size_t nread;
   uvwasi_errno_t err = uvwasi_fd_pread(&wasi->uvw_,
                                        fd,
                                        iovs,
@@ -677,7 +697,7 @@ void WASI::FdPread(const FunctionCallbackInfo<Value>& args) {
                                        offset,
                                        &nread);
   if (err == UVWASI_ESUCCESS)
-    wasi->writeUInt32(memory, nread, nread_ptr);
+    uvwasi_serdes_write_size_t(memory, nread_ptr, nread);
 
   free(iovs);
   args.GetReturnValue().Set(err);
@@ -696,14 +716,12 @@ void WASI::FdPrestatGet(const FunctionCallbackInfo<Value>& args) {
   ASSIGN_INITIALIZED_OR_RETURN_UNWRAP(&wasi, args.This());
   Debug(wasi, "fd_prestat_get(%d, %d)\n", fd, buf);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, buf, 8);
+  CHECK_BOUNDS_OR_RETURN(args, mem_size, buf, UVWASI_SERDES_SIZE_prestat_t);
   uvwasi_prestat_t prestat;
   uvwasi_errno_t err = uvwasi_fd_prestat_get(&wasi->uvw_, fd, &prestat);
 
-  if (err == UVWASI_ESUCCESS) {
-    wasi->writeUInt32(memory, prestat.pr_type, buf);
-    wasi->writeUInt32(memory, prestat.u.dir.pr_name_len, buf + 4);
-  }
+  if (err == UVWASI_ESUCCESS)
+    uvwasi_serdes_write_prestat_t(memory, buf, &prestat);
 
   args.GetReturnValue().Set(err);
 }
@@ -757,7 +775,10 @@ void WASI::FdPwrite(const FunctionCallbackInfo<Value>& args) {
         nwritten_ptr);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
   CHECK_BOUNDS_OR_RETURN(args, mem_size, iovs_ptr, iovs_len * 8);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, nwritten_ptr, 4);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         nwritten_ptr,
+                         UVWASI_SERDES_SIZE_size_t);
   uvwasi_ciovec_t* iovs = UncheckedCalloc<uvwasi_ciovec_t>(iovs_len);
 
   if (iovs == nullptr) {
@@ -783,7 +804,7 @@ void WASI::FdPwrite(const FunctionCallbackInfo<Value>& args) {
     iovs[i].buf_len = buf_len;
   }
 
-  size_t nwritten;
+  uvwasi_size_t nwritten;
   uvwasi_errno_t err = uvwasi_fd_pwrite(&wasi->uvw_,
                                         fd,
                                         iovs,
@@ -791,7 +812,7 @@ void WASI::FdPwrite(const FunctionCallbackInfo<Value>& args) {
                                         offset,
                                         &nwritten);
   if (err == UVWASI_ESUCCESS)
-    wasi->writeUInt32(memory, nwritten, nwritten_ptr);
+    uvwasi_serdes_write_size_t(memory, nwritten_ptr, nwritten);
 
   free(iovs);
   args.GetReturnValue().Set(err);
@@ -815,7 +836,7 @@ void WASI::FdRead(const FunctionCallbackInfo<Value>& args) {
   Debug(wasi, "fd_read(%d, %d, %d, %d)\n", fd, iovs_ptr, iovs_len, nread_ptr);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
   CHECK_BOUNDS_OR_RETURN(args, mem_size, iovs_ptr, iovs_len * 8);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, nread_ptr, 4);
+  CHECK_BOUNDS_OR_RETURN(args, mem_size, nread_ptr, UVWASI_SERDES_SIZE_size_t);
   uvwasi_iovec_t* iovs = UncheckedCalloc<uvwasi_iovec_t>(iovs_len);
 
   if (iovs == nullptr) {
@@ -841,14 +862,14 @@ void WASI::FdRead(const FunctionCallbackInfo<Value>& args) {
     iovs[i].buf_len = buf_len;
   }
 
-  size_t nread;
+  uvwasi_size_t nread;
   uvwasi_errno_t err = uvwasi_fd_read(&wasi->uvw_,
                                       fd,
                                       iovs,
                                       iovs_len,
                                       &nread);
   if (err == UVWASI_ESUCCESS)
-    wasi->writeUInt32(memory, nread, nread_ptr);
+    uvwasi_serdes_write_size_t(memory, nread_ptr, nread);
 
   free(iovs);
   args.GetReturnValue().Set(err);
@@ -880,8 +901,11 @@ void WASI::FdReaddir(const FunctionCallbackInfo<Value>& args) {
         bufused_ptr);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
   CHECK_BOUNDS_OR_RETURN(args, mem_size, buf_ptr, buf_len);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, bufused_ptr, 4);
-  size_t bufused;
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         bufused_ptr,
+                         UVWASI_SERDES_SIZE_size_t);
+  uvwasi_size_t bufused;
   uvwasi_errno_t err = uvwasi_fd_readdir(&wasi->uvw_,
                                          fd,
                                          &memory[buf_ptr],
@@ -889,7 +913,7 @@ void WASI::FdReaddir(const FunctionCallbackInfo<Value>& args) {
                                          cookie,
                                          &bufused);
   if (err == UVWASI_ESUCCESS)
-    wasi->writeUInt32(memory, bufused, bufused_ptr);
+    uvwasi_serdes_write_size_t(memory, bufused_ptr, bufused);
 
   args.GetReturnValue().Set(err);
 }
@@ -925,7 +949,10 @@ void WASI::FdSeek(const FunctionCallbackInfo<Value>& args) {
   ASSIGN_INITIALIZED_OR_RETURN_UNWRAP(&wasi, args.This());
   Debug(wasi, "fd_seek(%d, %d, %d, %d)\n", fd, offset, whence, newoffset_ptr);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, newoffset_ptr, 8);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         newoffset_ptr,
+                         UVWASI_SERDES_SIZE_filesize_t);
   uvwasi_filesize_t newoffset;
   uvwasi_errno_t err = uvwasi_fd_seek(&wasi->uvw_,
                                       fd,
@@ -933,7 +960,7 @@ void WASI::FdSeek(const FunctionCallbackInfo<Value>& args) {
                                       whence,
                                       &newoffset);
   if (err == UVWASI_ESUCCESS)
-    wasi->writeUInt64(memory, newoffset, newoffset_ptr);
+    uvwasi_serdes_write_filesize_t(memory, newoffset_ptr, newoffset);
 
   args.GetReturnValue().Set(err);
 }
@@ -963,12 +990,15 @@ void WASI::FdTell(const FunctionCallbackInfo<Value>& args) {
   ASSIGN_INITIALIZED_OR_RETURN_UNWRAP(&wasi, args.This());
   Debug(wasi, "fd_tell(%d, %d)\n", fd, offset_ptr);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, offset_ptr, 8);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         offset_ptr,
+                         UVWASI_SERDES_SIZE_filesize_t);
   uvwasi_filesize_t offset;
   uvwasi_errno_t err = uvwasi_fd_tell(&wasi->uvw_, fd, &offset);
 
   if (err == UVWASI_ESUCCESS)
-    wasi->writeUInt64(memory, offset, offset_ptr);
+    uvwasi_serdes_write_filesize_t(memory, offset_ptr, offset);
 
   args.GetReturnValue().Set(err);
 }
@@ -996,7 +1026,10 @@ void WASI::FdWrite(const FunctionCallbackInfo<Value>& args) {
         nwritten_ptr);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
   CHECK_BOUNDS_OR_RETURN(args, mem_size, iovs_ptr, iovs_len * 8);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, nwritten_ptr, 4);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         nwritten_ptr,
+                         UVWASI_SERDES_SIZE_size_t);
   uvwasi_ciovec_t* iovs = UncheckedCalloc<uvwasi_ciovec_t>(iovs_len);
 
   if (iovs == nullptr) {
@@ -1022,14 +1055,14 @@ void WASI::FdWrite(const FunctionCallbackInfo<Value>& args) {
     iovs[i].buf_len = buf_len;
   }
 
-  size_t nwritten;
+  uvwasi_size_t nwritten;
   uvwasi_errno_t err = uvwasi_fd_write(&wasi->uvw_,
                                        fd,
                                        iovs,
                                        iovs_len,
                                        &nwritten);
   if (err == UVWASI_ESUCCESS)
-    wasi->writeUInt32(memory, nwritten, nwritten_ptr);
+    uvwasi_serdes_write_size_t(memory, nwritten_ptr, nwritten);
 
   free(iovs);
   args.GetReturnValue().Set(err);
@@ -1082,7 +1115,10 @@ void WASI::PathFilestatGet(const FunctionCallbackInfo<Value>& args) {
         path_len);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
   CHECK_BOUNDS_OR_RETURN(args, mem_size, path_ptr, path_len);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, buf_ptr, 64);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         buf_ptr,
+                         UVWASI_SERDES_SIZE_filestat_t);
   uvwasi_filestat_t stats;
   uvwasi_errno_t err = uvwasi_path_filestat_get(&wasi->uvw_,
                                                 fd,
@@ -1090,16 +1126,8 @@ void WASI::PathFilestatGet(const FunctionCallbackInfo<Value>& args) {
                                                 &memory[path_ptr],
                                                 path_len,
                                                 &stats);
-  if (err == UVWASI_ESUCCESS) {
-    wasi->writeUInt64(memory, stats.st_dev, buf_ptr);
-    wasi->writeUInt64(memory, stats.st_ino, buf_ptr + 8);
-    wasi->writeUInt8(memory, stats.st_filetype, buf_ptr + 16);
-    wasi->writeUInt64(memory, stats.st_nlink, buf_ptr + 24);
-    wasi->writeUInt64(memory, stats.st_size, buf_ptr + 32);
-    wasi->writeUInt64(memory, stats.st_atim, buf_ptr + 40);
-    wasi->writeUInt64(memory, stats.st_mtim, buf_ptr + 48);
-    wasi->writeUInt64(memory, stats.st_ctim, buf_ptr + 56);
-  }
+  if (err == UVWASI_ESUCCESS)
+    uvwasi_serdes_write_filestat_t(memory, buf_ptr, &stats);
 
   args.GetReturnValue().Set(err);
 }
@@ -1229,7 +1257,7 @@ void WASI::PathOpen(const FunctionCallbackInfo<Value>& args) {
         fd_ptr);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
   CHECK_BOUNDS_OR_RETURN(args, mem_size, path_ptr, path_len);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, fd_ptr, 4);
+  CHECK_BOUNDS_OR_RETURN(args, mem_size, fd_ptr, UVWASI_SERDES_SIZE_fd_t);
   uvwasi_fd_t fd;
   uvwasi_errno_t err = uvwasi_path_open(&wasi->uvw_,
                                         dirfd,
@@ -1242,7 +1270,7 @@ void WASI::PathOpen(const FunctionCallbackInfo<Value>& args) {
                                         static_cast<uvwasi_fdflags_t>(fs_flags),
                                         &fd);
   if (err == UVWASI_ESUCCESS)
-    wasi->writeUInt32(memory, fd, fd_ptr);
+    uvwasi_serdes_write_size_t(memory, fd_ptr, fd);
 
   args.GetReturnValue().Set(err);
 }
@@ -1277,17 +1305,20 @@ void WASI::PathReadlink(const FunctionCallbackInfo<Value>& args) {
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
   CHECK_BOUNDS_OR_RETURN(args, mem_size, path_ptr, path_len);
   CHECK_BOUNDS_OR_RETURN(args, mem_size, buf_ptr, buf_len);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, bufused_ptr, 4);
-  size_t bufused;
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         bufused_ptr,
+                         UVWASI_SERDES_SIZE_size_t);
+  uvwasi_size_t bufused;
   uvwasi_errno_t err = uvwasi_path_readlink(&wasi->uvw_,
-                                        fd,
-                                        &memory[path_ptr],
-                                        path_len,
-                                        &memory[buf_ptr],
-                                        buf_len,
-                                        &bufused);
+                                            fd,
+                                            &memory[path_ptr],
+                                            path_len,
+                                            &memory[buf_ptr],
+                                            buf_len,
+                                            &bufused);
   if (err == UVWASI_ESUCCESS)
-    wasi->writeUInt32(memory, bufused, bufused_ptr);
+    uvwasi_serdes_write_size_t(memory, bufused_ptr, bufused);
 
   args.GetReturnValue().Set(err);
 }
@@ -1436,9 +1467,18 @@ void WASI::PollOneoff(const FunctionCallbackInfo<Value>& args) {
         nsubscriptions,
         nevents_ptr);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, in_ptr, nsubscriptions * 48);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, out_ptr, nsubscriptions * 32);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, nevents_ptr, 4);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         in_ptr,
+                         nsubscriptions * UVWASI_SERDES_SIZE_subscription_t);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         out_ptr,
+                         nsubscriptions * UVWASI_SERDES_SIZE_event_t);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         nevents_ptr,
+                         UVWASI_SERDES_SIZE_size_t);
   uvwasi_subscription_t* in =
       UncheckedCalloc<uvwasi_subscription_t>(nsubscriptions);
 
@@ -1456,46 +1496,22 @@ void WASI::PollOneoff(const FunctionCallbackInfo<Value>& args) {
   }
 
   for (uint32_t i = 0; i < nsubscriptions; ++i) {
-    uvwasi_subscription_t* sub = &in[i];
-    wasi->readUInt64(memory, &sub->userdata, in_ptr);
-    wasi->readUInt8(memory, &sub->type, in_ptr + 8);
-
-    if (sub->type == UVWASI_EVENTTYPE_CLOCK) {
-      wasi->readUInt32(memory, &sub->u.clock.clock_id, in_ptr + 16);
-      wasi->readUInt64(memory, &sub->u.clock.timeout, in_ptr + 24);
-      wasi->readUInt64(memory, &sub->u.clock.precision, in_ptr + 32);
-      wasi->readUInt16(memory, &sub->u.clock.flags, in_ptr + 40);
-    } else if (sub->type == UVWASI_EVENTTYPE_FD_READ ||
-               sub->type == UVWASI_EVENTTYPE_FD_WRITE) {
-      wasi->readUInt32(memory, &sub->u.fd_readwrite.fd, in_ptr + 16);
-    }
-
-    in_ptr += 48;
+    uvwasi_serdes_read_subscription_t(memory, in_ptr, &in[i]);
+    in_ptr += UVWASI_SERDES_SIZE_subscription_t;
   }
 
-  size_t nevents;
+  uvwasi_size_t nevents;
   uvwasi_errno_t err = uvwasi_poll_oneoff(&wasi->uvw_,
                                           in,
                                           out,
                                           nsubscriptions,
                                           &nevents);
   if (err == UVWASI_ESUCCESS) {
-    wasi->writeUInt32(memory, nevents, nevents_ptr);
+    uvwasi_serdes_write_size_t(memory, nevents_ptr, nevents);
 
     for (uint32_t i = 0; i < nsubscriptions; ++i) {
-      uvwasi_event_t event = out[i];
-
-      wasi->writeUInt64(memory, event.userdata, out_ptr);
-      wasi->writeUInt16(memory, event.error, out_ptr + 8);
-      wasi->writeUInt8(memory, event.type, out_ptr + 10);
-
-      if (event.type == UVWASI_EVENTTYPE_FD_READ ||
-          event.type == UVWASI_EVENTTYPE_FD_WRITE) {
-        wasi->writeUInt64(memory, event.u.fd_readwrite.nbytes, out_ptr + 16);
-        wasi->writeUInt16(memory, event.u.fd_readwrite.flags, out_ptr + 24);
-      }
-
-      out_ptr += 32;
+      uvwasi_serdes_write_event_t(memory, out_ptr, &out[i]);
+      out_ptr += UVWASI_SERDES_SIZE_event_t;
     }
   }
 
@@ -1613,7 +1629,7 @@ void WASI::SockRecv(const FunctionCallbackInfo<Value>& args) {
     ri_data[i].buf_len = buf_len;
   }
 
-  size_t ro_datalen;
+  uvwasi_size_t ro_datalen;
   uvwasi_roflags_t ro_flags;
   uvwasi_errno_t err = uvwasi_sock_recv(&wasi->uvw_,
                                         sock,
@@ -1623,8 +1639,8 @@ void WASI::SockRecv(const FunctionCallbackInfo<Value>& args) {
                                         &ro_datalen,
                                         &ro_flags);
   if (err == UVWASI_ESUCCESS) {
-    wasi->writeUInt32(memory, ro_datalen, ro_datalen_ptr);
-    wasi->writeUInt32(memory, ro_flags, ro_flags_ptr);
+    uvwasi_serdes_write_size_t(memory, ro_datalen_ptr, ro_datalen);
+    uvwasi_serdes_write_roflags_t(memory, ro_flags_ptr, ro_flags);
   }
 
   free(ri_data);
@@ -1657,7 +1673,10 @@ void WASI::SockSend(const FunctionCallbackInfo<Value>& args) {
         so_datalen_ptr);
   GET_BACKING_STORE_OR_RETURN(wasi, args, &memory, &mem_size);
   CHECK_BOUNDS_OR_RETURN(args, mem_size, si_data_ptr, si_data_len * 8);
-  CHECK_BOUNDS_OR_RETURN(args, mem_size, so_datalen_ptr, 4);
+  CHECK_BOUNDS_OR_RETURN(args,
+                         mem_size,
+                         so_datalen_ptr,
+                         UVWASI_SERDES_SIZE_size_t);
   uvwasi_ciovec_t* si_data = UncheckedCalloc<uvwasi_ciovec_t>(si_data_len);
 
   if (si_data == nullptr) {
@@ -1683,7 +1702,7 @@ void WASI::SockSend(const FunctionCallbackInfo<Value>& args) {
     si_data[i].buf_len = buf_len;
   }
 
-  size_t so_datalen;
+  uvwasi_size_t so_datalen;
   uvwasi_errno_t err = uvwasi_sock_send(&wasi->uvw_,
                                         sock,
                                         si_data,
@@ -1691,7 +1710,7 @@ void WASI::SockSend(const FunctionCallbackInfo<Value>& args) {
                                         si_flags,
                                         &so_datalen);
   if (err == UVWASI_ESUCCESS)
-    wasi->writeUInt32(memory, so_datalen, so_datalen_ptr);
+    uvwasi_serdes_write_size_t(memory, so_datalen_ptr, so_datalen);
 
   free(si_data);
   args.GetReturnValue().Set(err);
@@ -1721,78 +1740,9 @@ void WASI::_SetMemory(const FunctionCallbackInfo<Value>& args) {
 }
 
 
-void WASI::readUInt8(char* memory, uint8_t* value, uint32_t offset) {
-  CHECK_NOT_NULL(memory);
-  CHECK_NOT_NULL(value);
-  *value = memory[offset] & 0xFF;
-}
-
-
-void WASI::readUInt16(char* memory, uint16_t* value, uint32_t offset) {
-  CHECK_NOT_NULL(memory);
-  CHECK_NOT_NULL(value);
-  *value = (memory[offset] & 0xFF) |
-           ((memory[offset + 1] & 0xFF) << 8);
-}
-
-
 void WASI::readUInt32(char* memory, uint32_t* value, uint32_t offset) {
-  CHECK_NOT_NULL(memory);
   CHECK_NOT_NULL(value);
-  *value = (memory[offset] & 0xFF) |
-           ((memory[offset + 1] & 0xFF) << 8) |
-           ((memory[offset + 2] & 0xFF) << 16) |
-           ((memory[offset + 3] & 0xFF) << 24);
-}
-
-
-void WASI::readUInt64(char* memory, uint64_t* value, uint32_t offset) {
-  CHECK_NOT_NULL(memory);
-  CHECK_NOT_NULL(value);
-  uint64_t low = (memory[offset] & 0xFF) |
-                 ((memory[offset + 1] & 0xFF) << 8) |
-                 ((memory[offset + 2] & 0xFF) << 16) |
-                 ((memory[offset + 3] & 0xFF) << 24);
-  uint64_t high = (memory[offset + 4] & 0xFF) |
-                  ((memory[offset + 5] & 0xFF) << 8) |
-                  ((memory[offset + 6] & 0xFF) << 16) |
-                  ((memory[offset + 7] & 0xFF) << 24);
-  *value = (high << 32) + low;
-}
-
-
-void WASI::writeUInt8(char* memory, uint8_t value, uint32_t offset) {
-  CHECK_NOT_NULL(memory);
-  memory[offset] = value & 0xFF;
-}
-
-
-void WASI::writeUInt16(char* memory, uint16_t value, uint32_t offset) {
-  CHECK_NOT_NULL(memory);
-  memory[offset++] = value & 0xFF;
-  memory[offset] = (value >> 8) & 0xFF;
-}
-
-
-void WASI::writeUInt32(char* memory, uint32_t value, uint32_t offset) {
-  CHECK_NOT_NULL(memory);
-  memory[offset++] = value & 0xFF;
-  memory[offset++] = (value >> 8) & 0xFF;
-  memory[offset++] = (value >> 16) & 0xFF;
-  memory[offset] = (value >> 24) & 0xFF;
-}
-
-
-void WASI::writeUInt64(char* memory, uint64_t value, uint32_t offset) {
-  CHECK_NOT_NULL(memory);
-  memory[offset++] = value & 0xFF;
-  memory[offset++] = (value >> 8) & 0xFF;
-  memory[offset++] = (value >> 16) & 0xFF;
-  memory[offset++] = (value >> 24) & 0xFF;
-  memory[offset++] = (value >> 32) & 0xFF;
-  memory[offset++] = (value >> 40) & 0xFF;
-  memory[offset++] = (value >> 48) & 0xFF;
-  memory[offset] = (value >> 56) & 0xFF;
+  *value = uvwasi_serdes_read_uint32_t(memory, offset);
 }
 
 
@@ -1811,6 +1761,7 @@ uvwasi_errno_t WASI::backingStore(char** store, size_t* byte_length) {
   std::shared_ptr<BackingStore> backing_store = ab->GetBackingStore();
   *byte_length = backing_store->ByteLength();
   *store = static_cast<char*>(backing_store->Data());
+  CHECK_NOT_NULL(*store);
   return UVWASI_ESUCCESS;
 }
 
