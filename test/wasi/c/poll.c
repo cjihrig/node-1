@@ -16,7 +16,15 @@ int main(void) {
   assert(fds[0].revents == POLLOUT);
   assert(fds[1].revents == POLLOUT);
 
+  // The original version of this test expected a timeout and return value of
+  // zero. In the Node test suite, STDIN is not a TTY, and poll() returns one,
+  // with revents = POLLHUP | POLLIN.
   fds[0] = (struct pollfd){.fd = 0, .events = POLLIN, .revents = 0};
+  ret = poll(fds, 1, 2000);
+  assert(ret == 1);
+  assert(fds[0].revents == (POLLHUP | POLLIN));
+
+  fds[0] = (struct pollfd){.fd = -1, .events = 0, .revents = 0};
   time(&before);
   ret = poll(fds, 1, 2000);
   time(&now);

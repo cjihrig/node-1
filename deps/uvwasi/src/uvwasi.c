@@ -7,6 +7,7 @@
 # include <unistd.h>
 # include <dirent.h>
 # include <time.h>
+# include <poll.h> /* Used by poll_oneoff(). */
 #else
 # include <io.h>
 #endif /* _WIN32 */
@@ -1923,8 +1924,157 @@ uvwasi_errno_t uvwasi_poll_oneoff(uvwasi_t* uvwasi,
                                   uvwasi_event_t* out,
                                   size_t nsubscriptions,
                                   size_t* nevents) {
-  /* TODO(cjihrig): Implement this. */
-  return UVWASI_ENOTSUP;
+#ifdef _WIN32
+  /* TODO(cjihrig): Missing Windows support. */
+  return UVWASI_ENOSYS;
+#else
+  uvwasi_subscription_t sub;
+  struct uvwasi_fd_wrap_t* wrap;
+  uvwasi_event_t* event;
+  uvwasi_userdata_t timer_userdata;
+  uvwasi_timestamp_t min_timeout;
+  uvwasi_timestamp_t cur_timeout;
+  uvwasi_rights_t rights;
+  uvwasi_errno_t err;
+  struct pollfd* poll_fds;
+  nfds_t fd_cnt;
+  size_t i;
+  int has_timeout;
+  int timeout;
+  short revents;
+  int r;
+
+  // DEBUG("uvwasi_poll_oneoff(uvwasi=%p, in=%p, out=%p, nsubscriptions=%zu, "
+  //       "nevents=%p)\n",
+  //       uvwasi,
+  //       in,
+  //       out,
+  //       nsubscriptions,
+  //       nevents);
+
+  if (uvwasi == NULL || in == NULL || out == NULL ||
+      nsubscriptions == 0 || nevents == NULL) {
+    return UVWASI_EINVAL;
+  }
+
+  *nevents = 0;
+
+  poll_fds = uvwasi__calloc(uvwasi, nsubscriptions, sizeof(*poll_fds));
+  if (poll_fds == NULL)
+    return UVWASI_ENOMEM;
+
+  has_timeout = 0;
+  min_timeout = 0;
+  fd_cnt = 0;
+  err = UVWASI_ESUCCESS;
+
+  for (i = 0; i < nsubscriptions; i++) {
+    sub = in[i];
+
+    switch (sub.type) {
+      case UVWASI_EVENTTYPE_CLOCK:
+        if (sub.u.clock.flags == UVWASI_SUBSCRIPTION_CLOCK_ABSTIME) {
+          /* TODO(cjihrig): Currently wrong. Convert this to a duration. */
+          cur_timeout = sub.u.clock.timeout;
+          err = UVWASI_EINVAL;
+          goto exit;
+        } else {
+          cur_timeout = sub.u.clock.timeout;
+        }
+
+        if (has_timeout == 0 || cur_timeout < min_timeout) {
+          min_timeout = cur_timeout;
+          timer_userdata = sub.userdata;
+          has_timeout = 1;
+        }
+
+        break;
+      case UVWASI_EVENTTYPE_FD_READ:
+      case UVWASI_EVENTTYPE_FD_WRITE:
+        rights = UVWASI_RIGHT_POLL_FD_READWRITE;
+
+        if (sub.type == UVWASI_EVENTTYPE_FD_READ) {
+          rights |= UVWASI_RIGHT_FD_READ;
+          poll_fds[fd_cnt].events = POLLIN;
+        } else {
+          rights |= UVWASI_RIGHT_FD_WRITE;
+          poll_fds[fd_cnt].events = POLLOUT;
+        }
+
+        err = uvwasi_fd_table_get(&uvwasi->fds,
+                                  sub.u.fd_readwrite.fd,
+                                  &wrap,
+                                  rights,
+                                  0);
+        if (err != UVWASI_ESUCCESS)
+          return err;
+        uv_mutex_unlock(&wrap->mutex);
+
+        event = &out[fd_cnt];
+        event->userdata = sub.userdata;
+        event->error = UVWASI_ESUCCESS;
+        event->type = sub.type;
+        event->u.fd_readwrite.nbytes = 0;
+        event->u.fd_readwrite.flags = 0;
+        poll_fds[fd_cnt].fd = wrap->fd;
+        fd_cnt++;
+        break;
+      default:
+        err = UVWASI_EINVAL;
+        goto exit;
+    }
+  }
+
+  if (has_timeout == 0) {
+    timeout = -1;
+  } else {
+    /* Convert from nanoseconds to milliseconds. */
+    /* TODO(cjihrig): Check that result fits in int. */
+    timeout = min_timeout / 1000000;
+  }
+
+  do {
+    r = poll(poll_fds, fd_cnt, timeout);
+  } while (r == -1 && errno == EINTR);
+
+  /* Handle poll() errors, then timeouts, then happy path. */
+  if (r == -1) {
+    err = uvwasi__translate_uv_error(uv_translate_sys_error(errno));
+    goto exit;
+  } else if (r == 0) {
+    event = &out[0];
+    event->userdata = timer_userdata;
+    event->error = UVWASI_ESUCCESS;
+    event->type = UVWASI_EVENTTYPE_CLOCK;
+    *nevents = 1;
+  } else {
+    for (i = 0; i < fd_cnt; i++) {
+      event = &out[i];
+      revents = poll_fds[i].revents;
+
+      if ((revents & POLLNVAL) != 0) {
+        event->error = UVWASI_EBADF;
+      } else if ((revents & POLLERR) != 0) {
+        event->error = UVWASI_EIO;
+      } else if ((revents & POLLHUP) != 0) {
+        event->u.fd_readwrite.flags = UVWASI_EVENT_FD_READWRITE_HANGUP;
+      } else if ((revents & (POLLIN | POLLOUT)) != 0) {
+        /* TODO(cjihrig): Set nbytes. */
+      } else {
+        /* TODO(cjihrig): Currently unhandled case. */
+        event->error = UVWASI_ENOTSUP;
+      }
+    }
+
+    *nevents = fd_cnt;
+  }
+
+  err = UVWASI_ESUCCESS;
+
+exit:
+  uvwasi__free(uvwasi, poll_fds);
+  return err;
+#endif /* _WIN32 */
 }
 
 

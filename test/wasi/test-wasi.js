@@ -56,6 +56,13 @@ if (process.argv[2] === 'wasi-child') {
     assert.strictEqual(child.stdout.toString(), options.stdout || '');
   }
 
+  // Tests that are currently unsupported on Windows.
+  if (!common.isWindows) {
+    runWASI({ test: 'poll' });
+  }
+
+  // return;
+
   runWASI({ test: 'cant_dotdot' });
 
   // Tests that are currently unsupported on IBM i PASE.
@@ -75,7 +82,6 @@ if (process.argv[2] === 'wasi-child') {
   runWASI({ test: 'link' });
   runWASI({ test: 'main_args' });
   runWASI({ test: 'notdir' });
-  // runWASI({ test: 'poll' });
   runWASI({ test: 'preopen_populates' });
   runWASI({ test: 'read_file', stdout: `hello from input.txt${EOL}` });
   runWASI({
