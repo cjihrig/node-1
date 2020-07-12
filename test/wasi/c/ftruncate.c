@@ -6,14 +6,14 @@
 #define BASE_DIR "/tmp"
 #define OUTPUT_DIR BASE_DIR "/testdir"
 #define PATH OUTPUT_DIR "/output.txt"
-#define SIZE 500
-#define TRUNC_SIZE (SIZE / 2)
 
 int main(void) {
   struct stat st;
   int fd;
 
+  (void)st;
   assert(0 == mkdir(OUTPUT_DIR, 0755));
+
   fd = open(PATH, O_CREAT | O_WRONLY, 0666);
   assert(fd != -1);
 
@@ -23,16 +23,17 @@ int main(void) {
   assert(0 == lseek(fd, 0, SEEK_CUR));
 
   /* Increase the file size using ftruncate(). */
-  assert(0 == ftruncate(fd, SIZE));
+  assert(0 == ftruncate(fd, 500));
   assert(0 == fstat(fd, &st));
-  assert(st.st_size == SIZE);
+  assert(st.st_size == 500);
   assert(0 == lseek(fd, 0, SEEK_CUR));
 
   /* Truncate the file using ftruncate(). */
-  assert(0 == ftruncate(fd, TRUNC_SIZE));
+  assert(0 == ftruncate(fd, 300));
   assert(0 == fstat(fd, &st));
-  assert(st.st_size == TRUNC_SIZE);
+  assert(st.st_size == 300);
   assert(0 == lseek(fd, 0, SEEK_CUR));
 
+  assert(0 == close(fd));
   return 0;
 }
