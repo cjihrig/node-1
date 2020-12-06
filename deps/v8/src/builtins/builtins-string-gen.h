@@ -7,6 +7,17 @@
 
 #include "src/codegen/code-stub-assembler.h"
 
+
+// int CHECK_ENDIANNESS(void) {
+// #if V8_TARGET_BIG_ENDIAN
+//     return 100;
+// #else
+//     return 200;
+// #endif
+// }
+
+
+
 namespace v8 {
 namespace internal {
 

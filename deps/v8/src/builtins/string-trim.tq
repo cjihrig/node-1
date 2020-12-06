@@ -14,8 +14,31 @@ extern enum TrimMode extends uint31 constexpr 'String::TrimMode' {
 
 @export
 macro IsWhiteSpaceOrLineTerminator(charCode: int32): bool {
+  const foobar: Smi = Convert<Smi>(Convert<int32>(charCode));
+  const baz: Smi = Convert<Smi>(Convert<int32>(Int32Constant(0x0020)));
+  const zzz: Smi = Convert<Smi>(Convert<int32>(Int32Constant(0x20)));
+  const yyy: Smi = Convert<Smi>(Convert<int32>(32));
+  const qqq: Smi = Convert<Smi>(Convert<int32>(0x0020));
+  const abc: Smi = Convert<Smi>(Convert<int32>(Int32Constant(32)));
+  const xyz: Smi = Convert<Smi>(Convert<int32>(Int32Constant(0x00200000)));
+
+  Print("   - %d", foobar);
   // 0x0020 - SPACE (Intentionally out of order to fast path a commmon case)
+  Print("   - COMPARING TO SPACE CHARACTER %d", baz);
+  Print("   - zzz is %d", zzz);
+  Print("   - yyy is %d", yyy);
+  Print("   - qqq is %d", qqq);
+  Print("   - abc is %d", abc);
+  Print("   - xyz is %d", xyz);
+
+  //if (CHECK_ENDIANNESS() == 100) {
+  //  Print("   - BIG ENDIAN!!");
+  //} else {
+  //  Print("   - LITTLE ENDIAN!!");
+  //}
+
   if (charCode == Int32Constant(0x0020)) {
+    Print("      - Found a space character");
     return true;
   }
 
@@ -28,6 +51,7 @@ macro IsWhiteSpaceOrLineTerminator(charCode: int32): bool {
   // 0x000C - FORMFEED
   // 0x000D - HORIZONTAL TAB
   if (charCode <= Int32Constant(0x000D)) {
+    Print("      - Found a whitespace character");
     return true;
   }
 
@@ -104,7 +128,8 @@ transitioning macro StringTrim(implicit context: Context)(
 
   let startIndex: intptr = 0;
   let endIndex: intptr = stringLength - 1;
-
+  Print("Called StringTrim()");
+  Print(directString);
   // TODO(duongn): It would probably be more efficient to turn StringTrim into a
   // tempalate for the different string types and specialize the loop for them.
   if (variant == TrimMode::kTrim || variant == TrimMode::kTrimStart) {

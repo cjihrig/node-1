@@ -1829,11 +1829,14 @@ base::Optional<ParseResult> MakeNumberLiteralExpression(
   // TODO(tebbi): Support 64bit literals.
   // Meanwhile, we type it as constexpr float64 when out of int32 range.
   double value = 0;
+  std::cout << "MakeNumberLiteralExpression(" << number << ")\n";
   try {
     value = std::stod(number);
   } catch (const std::out_of_range&) {
+    std::cout << "******^^^&*********\n";
     Error("double literal out-of-range").Throw();
   }
+  std::cout << "Parsed to " << value << "\n";
   Expression* result = MakeNode<NumberLiteralExpression>(value);
   return ParseResult{result};
 }

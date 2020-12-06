@@ -453,7 +453,9 @@ class Grammar {
   // result.
   static base::Optional<ParseResult> YieldMatchedInput(
       ParseResultIterator* child_results) {
-    return ParseResult{child_results->matched_input().ToString()};
+        std::string match = child_results->matched_input().ToString();
+    std::cout << "matched input '" << match << "'\n";
+    return ParseResult{match};
   }
 
   // Create a new symbol to parse the given sequence of symbols.
