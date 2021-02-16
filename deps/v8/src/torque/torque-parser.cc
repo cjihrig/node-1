@@ -1833,10 +1833,11 @@ base::Optional<ParseResult> MakeNumberLiteralExpression(
 #if defined(V8_OS_SOLARIS)
     // stod() on Solaris does not currently support hex strings. Use strtol()
     // specifically for hex literals until stod() support is available.
-    if (number.find("0x") || number.find("0X")) {
-      value = static_cast<double>(strtol(number.c_str(), nullptr, 0));
-    } else {
+    if (number.find("0x") == std::string::npos &&
+        number.find("0X") == std::string::npos) {
       value = std::stod(number);
+    } else {
+      value = static_cast<double>(strtol(number.c_str(), nullptr, 0));
     }
 #else
     value = std::stod(number);
